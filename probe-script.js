@@ -1,24 +1,28 @@
 function probeList() {
-  const noteButtons = document.querySelectorAll('[aria-label="Add note"]');
-  console.log('Found rows:', noteButtons.length);
+  const rows = document.querySelectorAll('.BsJqK');
+  console.log('Found rows:', rows.length);
 
-  const results = Array.from(noteButtons).map((noteButton, index) => {
-    const button = noteButton.parentElement.parentElement.previousSibling;
-    if (!button) {
-      return { index, name: null, rawCategory: null, isPermanentlyClosed: false, isTemporarilyClosed: false, isBroken: false };
+  const results = Array.from(rows).map((row, index) => {
+    const nameElement = row.querySelector('.fontHeadlineSmall');
+    const name = nameElement ? nameElement.textContent.trim() : null;
+
+    // .yfRytc holds up to two .IIrLbb blocks: [0] = rating (if present), [1] = category.
+    // When there's no rating, the single block is the category.
+    const categoryBlocks = row.querySelectorAll('.yfRytc > .IIrLbb');
+    let rawCategory = null;
+    if (categoryBlocks.length >= 2) {
+      rawCategory = categoryBlocks[1].textContent.trim();
+    } else if (categoryBlocks.length === 1) {
+      rawCategory = categoryBlocks[0].textContent.trim();
     }
-
-    const nameElement = button.querySelector('.fontHeadlineSmall');
-    const categorySpan = button.querySelector('.fontBodyMedium > div:last-child > div:last-child span:last-child');
-    const rawCategory = categorySpan ? categorySpan.textContent.trim() : null;
     const lowerCategory = (rawCategory || '').toLowerCase();
 
-    const isBroken = Array.from(button.querySelectorAll('img'))
-      .some(img => img.src === 'https://maps.gstatic.com/tactile/pane/result-no-thumbnail-2x.png');
+    const isBroken = Array.from(row.querySelectorAll('img'))
+      .some(img => (img.src || '').includes('result-no-thumbnail'));
 
     return {
       index,
-      name: nameElement ? nameElement.textContent : null,
+      name,
       rawCategory,
       isPermanentlyClosed: lowerCategory.includes('permanently closed'),
       isTemporarilyClosed: lowerCategory.includes('temporarily closed'),
