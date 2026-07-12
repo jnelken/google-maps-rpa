@@ -25,4 +25,32 @@ list-modifying script, you can check what's actually there:
    list to load more rows, then run `probeList()` again in the console to
    sample further down.
 
+# Moving Starred places into Restaurants / Archived (Phase 2)
+
+Once you've probed the list and are ready to actually move things:
+
+1. In Google Maps, create an `Archived` list if you don't already have one
+   (same manual step as creating `Restaurants`, `Food`, etc.).
+2. Open the `Starred places` list.
+3. Copy and paste `move-script.js` into the browser Console and run it.
+4. On the first item it opens, it logs the real checkbox labels found in
+   the Save dialog — confirm `SOURCE_LIST_LABEL` (`'Starred'` by default)
+   actually appears in that list before trusting the rest of the run. If
+   it doesn't match, stop, edit the constant at the top of the script to
+   the label you actually see, and re-run.
+5. It moves permanently-closed places to `Archived`, restaurants (by
+   category) to `Restaurants`, and leaves everything else in `Starred
+   places`, printing a table of skipped items (name + category) for manual
+   follow-up.
+6. It processes one item at a time and recurses; if it looks stuck or
+   wrong, refresh the tab to stop it — it's safe to resume later since it
+   only acts on whatever's currently rendered.
+7. When it stops on its own ("No more matching rows..."), scroll the list
+   to load more rows and run `processStarred()` again in the console.
+
+The click-into-item / Save-dialog steps reuse the original script's DOM
+selectors, which are older than the list-row selectors and haven't been
+re-verified against Google Maps' current DOM — test on a couple of items
+before running against the whole list.
+
 Made by [@seifip](https://twitter.com/seifip) 
