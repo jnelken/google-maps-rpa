@@ -1,0 +1,8 @@
+# Scraped place data is personal (home/work addresses, kids' school, medical
+# providers, etc.) - never commit it, even though it lives inside the repo
+# so local scripts can read it.
+data/
+
+# Playwright MCP tool output (console logs, page snapshots) - local debugging
+# artifacts, not project source.
+.playwright-mcp/
