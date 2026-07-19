@@ -152,7 +152,11 @@ async function moveItem(row, targetLabel) {
     return false;
   }
 
-  row.click();
+  // The row div itself is an inert wrapper with no jsaction - the actual
+  // clickable element is the <button> that wraps the name (and image, and
+  // rating). Click that, not the row.
+  const clickTarget = nameElement.closest('button') || row;
+  clickTarget.click();
   const opened = await waitForTextToAppear(name, 'h1');
   if (!opened) {
     console.log(`Detail panel for "${name}" never opened (h1 text didn't match) - skipping`);
