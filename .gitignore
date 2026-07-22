@@ -6,3 +6,7 @@ data/
 # Playwright MCP tool output (console logs, page snapshots) - local debugging
 # artifacts, not project source.
 .playwright-mcp/
+
+# wrapup-repos automation's own scratch note - untracked-forever was making
+# this repo look "recently touched" indefinitely to the recency heuristic.
+NEXT-STEPS.md
