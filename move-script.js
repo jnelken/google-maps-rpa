@@ -23,14 +23,11 @@
 // matches, then run sweepRemoveFromStarred() (also scroll + re-run as
 // needed - same currently-rendered-only constraint applies).
 //
-// VALIDATION STATUS (2026-07): phase 1 (processStarred/addToList) has been
-// run live end-to-end multiple times with real, persisted results (verified
-// via a fresh page reload's list counts, not just in-session state). Phase 2
-// (sweepRemoveFromStarred/removeFromStarred) shares the same toggle/verify
-// primitives already proven in phase 1, but a live end-to-end run of phase 2
-// specifically was interrupted by a transient Google Maps loading/rate-limit
-// issue and not independently confirmed. Test it on 1-2 items before
-// trusting it against everything phase 1 added.
+// VALIDATION STATUS (2026-07): both phases have been run live end-to-end
+// against a real account, with results verified via a fresh page reload
+// (not just in-session state) - phase 1 confirmed adding to the target list
+// without touching SOURCE_LIST_LABEL, phase 2 confirmed removing from
+// SOURCE_LIST_LABEL afterward while leaving the target list additions intact.
 //
 // Also confirmed live: Google Maps uses two different layouts depending on
 // window width - one replaces the whole list panel with a place's page

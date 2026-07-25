@@ -62,9 +62,9 @@ made a single-pass "uncheck source, check target" approach unsafe. Splitting
 into add-then-sweep, with a close-and-reopen-the-dialog step before trusting
 any checked-state read, worked around it.
 
-The click-into-item / Save-dialog steps reuse the original script's DOM
-selectors, which are older than the list-row selectors — phase 1 has been
-run live end-to-end successfully; test phase 2 on a couple of items before
-trusting it against everything phase 1 added.
+Both phases have been run live end-to-end against a real account and
+verified via a fresh page reload (not just in-session state) — confirmed
+correctly adding to `Restaurants`/`Archived` without touching `Starred
+places`, and confirmed correctly removing from `Starred places` afterward.
 
 Made by [@seifip](https://twitter.com/seifip) 
