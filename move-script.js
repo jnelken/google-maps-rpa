@@ -1,7 +1,8 @@
 // Two-phase migration out of SOURCE_LIST_LABEL:
 //
 // Phase 1 - processStarred(): for each currently-rendered row, ADD matching
-// places to TARGET_LIST_LABEL (restaurant-category matches) or
+// places to TARGET_LIST_LABEL (restaurant-category matches),
+// COFFEE_LIST_LABEL (cafe/coffee-shop-category matches), or
 // ARCHIVE_LIST_LABEL (permanently closed). Does NOT touch SOURCE_LIST_LABEL
 // membership. Everything else is left alone and logged to `skipped`.
 //
@@ -38,6 +39,7 @@
 
 const SOURCE_LIST_LABEL = 'Starred places'; // confirmed live via the Save dialog's checkbox list
 const TARGET_LIST_LABEL = 'Restaurants';
+const COFFEE_LIST_LABEL = 'Coffee Shops';
 const ARCHIVE_LIST_LABEL = 'Archived';
 
 // Derived from real category strings in data/starred-places.json via
@@ -47,6 +49,11 @@ const RESTAURANT_TYPES = [
   'japanese', 'british', 'mediterranean', 'sri lankan', 'bistro', 'diner',
   'grill',
 ];
+
+// Only the real coffee-shop categories from data/starred-places.json -
+// 'juice' also shows up under categorize.js's broader CAFE_TYPES bucket but
+// juice bars aren't coffee shops, so left out here on purpose.
+const COFFEE_TYPES = ['cafe', 'coffee shop'];
 
 // "$20-70 · Italian" -> "italian"; "Medical clinic" -> "medical clinic"
 function extractType(rawCategory) {
@@ -58,6 +65,11 @@ function extractType(rawCategory) {
 function isTargetMatch(rawCategory) {
   const type = extractType(rawCategory);
   return !!type && RESTAURANT_TYPES.includes(type);
+}
+
+function isCoffeeMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && COFFEE_TYPES.includes(type);
 }
 
 const skipped = [];
@@ -295,6 +307,18 @@ async function processStarred() {
         return processStarred();
       }
       console.log(`Failed to add ${key} to ${TARGET_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isCoffeeMatch(rawCategory)) {
+      console.log(`Adding to ${COFFEE_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, COFFEE_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: COFFEE_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${COFFEE_LIST_LABEL}, leaving in place for manual review`);
       skipped.push({ name: key, rawCategory });
       continue;
     }

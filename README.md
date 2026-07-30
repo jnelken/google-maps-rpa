@@ -25,20 +25,22 @@ list-modifying script, you can check what's actually there:
    list to load more rows, then run `probeList()` again in the console to
    sample further down.
 
-# Moving Starred places into Restaurants / Archived (Phase 2)
+# Moving Starred places into Restaurants / Coffee Shops / Archived (Phase 2)
 
 This is a two-phase process — it never removes anything from `Starred
 places` until you explicitly run phase 2, so it's safe to stop after phase 1
 and review before committing to the removals.
 
-1. In Google Maps, create an `Archived` list if you don't already have one
-   (same manual step as creating `Restaurants`, `Food`, etc.).
+1. In Google Maps, create `Archived` and `Coffee Shops` lists if you don't
+   already have them (same manual step as creating `Restaurants`, `Food`,
+   etc.).
 2. Open the `Starred places` list.
 3. Copy and paste `move-script.js` into the browser Console and run it.
-   This is phase 1: it *adds* permanently-closed places to `Archived` and
-   restaurants (by category) to `Restaurants`, without touching `Starred
-   places` membership. Everything else is left alone and printed as a table
-   of skipped items (name + category) for manual follow-up.
+   This is phase 1: it *adds* permanently-closed places to `Archived`,
+   restaurants (by category) to `Restaurants`, and cafes/coffee shops (by
+   category) to `Coffee Shops`, without touching `Starred places`
+   membership. Everything else is left alone and printed as a table of
+   skipped items (name + category) for manual follow-up.
 4. On the first item it opens, it logs the real checkbox labels found in
    the Save dialog — confirm `SOURCE_LIST_LABEL` (`'Starred places'` by
    default) actually appears in that list before trusting the rest of the
