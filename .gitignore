@@ -10,3 +10,7 @@ data/
 # wrapup-repos automation's own scratch note - untracked-forever was making
 # this repo look "recently touched" indefinitely to the recency heuristic.
 NEXT-STEPS.md
+
+# Local Claude Code state (tool permission grants, session continuity notes)
+# - not project source, never shared.
+.claude/
