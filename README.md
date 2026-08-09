@@ -25,22 +25,47 @@ list-modifying script, you can check what's actually there:
    list to load more rows, then run `probeList()` again in the console to
    sample further down.
 
-# Moving Starred places into Restaurants / Coffee Shops / Archived (Phase 2)
+# Moving Starred places into topic lists (Phase 2)
 
 This is a two-phase process — it never removes anything from `Starred
 places` until you explicitly run phase 2, so it's safe to stop after phase 1
 and review before committing to the removals.
 
-1. In Google Maps, create `Archived` and `Coffee Shops` lists if you don't
-   already have them (same manual step as creating `Restaurants`, `Food`,
-   etc.).
+`move-script.js` routes each currently-rendered Starred place into one of
+the following lists, based on its category (matching the taxonomy in
+`scripts/categorize.js` — `RESTAURANT_TYPES`, `CAFE_TYPES`,
+`NIGHTLIFE_TYPES`, etc.):
+
+- `Restaurants` (restaurant/cuisine categories)
+- `Coffee Shops` (cafes, coffee shops, juice bars, health food)
+- `Nightlife` (bars, pubs, night clubs)
+- `Forest` (vets, pet stores, dog parks)
+- `Visited` (hotels, transit hubs, past-trip locations)
+- `Outdoors` (hiking, parks, tourist attractions)
+- `Health` (clinics, pharmacies, doctors)
+- `Kids` (preschools, day cares, playgrounds)
+- `Beauty` (barbers, spas, beauty supply)
+- `Shopping` (clothing, furniture, markets)
+- `Errands` (storage, parking, shipping, real estate)
+- `Fitness` (fitness centers)
+- `Going Out` (event venues, movie theaters)
+- `Ashrams` (non-profits, temples, community centers)
+- `Desks` (software companies, corporate offices)
+- `Archived` (permanently closed places)
+
+Anything matching none of these categories is left in `Starred places` and
+logged to the `skipped` table for manual review — that's expected, not a
+bug; the goal is to minimize, not necessarily zero out, what's left in
+Starred places.
+
+1. In Google Maps, create any of the lists above that you don't already
+   have (same manual step as creating `Restaurants`, `Food`, etc.).
 2. Open the `Starred places` list.
 3. Copy and paste `move-script.js` into the browser Console and run it.
-   This is phase 1: it *adds* permanently-closed places to `Archived`,
-   restaurants (by category) to `Restaurants`, and cafes/coffee shops (by
-   category) to `Coffee Shops`, without touching `Starred places`
-   membership. Everything else is left alone and printed as a table of
-   skipped items (name + category) for manual follow-up.
+   This is phase 1: it *adds* each place to its matching list (see above),
+   without touching `Starred places` membership. Everything else is left
+   alone and printed as a table of skipped items (name + category) for
+   manual follow-up.
 4. On the first item it opens, it logs the real checkbox labels found in
    the Save dialog — confirm `SOURCE_LIST_LABEL` (`'Starred places'` by
    default) actually appears in that list before trusting the rest of the
@@ -51,8 +76,8 @@ and review before committing to the removals.
    only acts on whatever's currently rendered.
 6. When it stops on its own ("No more matching rows..."), scroll the list
    to load more rows and run `processStarred()` again in the console.
-7. Once you're happy with what got added (check `Restaurants` / `Archived`
-   directly), run `sweepRemoveFromStarred()` in the same console session —
+7. Once you're happy with what got added (check the target lists directly),
+   run `sweepRemoveFromStarred()` in the same console session —
    this is phase 2, and it removes everything phase 1 successfully added
    from `Starred places`. Same scroll-and-re-run pattern applies if it
    doesn't find everything in one pass.

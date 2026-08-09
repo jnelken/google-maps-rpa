@@ -1,10 +1,15 @@
 // Two-phase migration out of SOURCE_LIST_LABEL:
 //
 // Phase 1 - processStarred(): for each currently-rendered row, ADD matching
-// places to TARGET_LIST_LABEL (restaurant-category matches),
-// COFFEE_LIST_LABEL (cafe/coffee-shop-category matches), or
-// ARCHIVE_LIST_LABEL (permanently closed). Does NOT touch SOURCE_LIST_LABEL
-// membership. Everything else is left alone and logged to `skipped`.
+// places to the target list for its category (Restaurants, Coffee Shops,
+// Nightlife, Forest, Visited, Outdoors, Health, Kids, Beauty, Shopping,
+// Errands, Fitness, Going Out, Ashrams, Desks), or ARCHIVE_LIST_LABEL
+// (permanently closed). Category -> list mapping mirrors
+// scripts/categorize.js's taxonomy (RESTAURANT_TYPES, CAFE_TYPES, etc.),
+// derived from real category strings in data/starred-places.json - kept in
+// sync manually. Does NOT touch SOURCE_LIST_LABEL membership. Anything
+// matching no category (categorize.js's "Skipped"/"FlagForDeletion") is left
+// alone and logged to `skipped` - that's expected, not a bug.
 //
 // Phase 2 - sweepRemoveFromStarred(): run this separately once you're happy
 // with what phase 1 added. It removes every place phase 1 successfully
@@ -41,19 +46,69 @@ const SOURCE_LIST_LABEL = 'Starred places'; // confirmed live via the Save dialo
 const TARGET_LIST_LABEL = 'Restaurants';
 const COFFEE_LIST_LABEL = 'Coffee Shops';
 const ARCHIVE_LIST_LABEL = 'Archived';
+const NIGHTLIFE_LIST_LABEL = 'Nightlife';
+const FOREST_LIST_LABEL = 'Forest';
+const VISITED_LIST_LABEL = 'Visited';
+const OUTDOORS_LIST_LABEL = 'Outdoors';
+const HEALTH_LIST_LABEL = 'Health';
+const KIDS_LIST_LABEL = 'Kids';
+const BEAUTY_LIST_LABEL = 'Beauty';
+const SHOPPING_LIST_LABEL = 'Shopping';
+const ERRANDS_LIST_LABEL = 'Errands';
+const FITNESS_LIST_LABEL = 'Fitness';
+const GOING_OUT_LIST_LABEL = 'Going Out';
+const ASHRAMS_LIST_LABEL = 'Ashrams';
+const DESKS_LIST_LABEL = 'Desks';
 
-// Derived from real category strings in data/starred-places.json via
-// scripts/categorize.js's RESTAURANT_TYPES - kept in sync manually.
+// Derived verbatim from scripts/categorize.js's category taxonomy, which was
+// itself derived from real category strings in data/starred-places.json -
+// kept in sync manually.
 const RESTAURANT_TYPES = [
   'restaurant', 'italian', 'mexican', 'chicken', 'american', 'new american',
   'japanese', 'british', 'mediterranean', 'sri lankan', 'bistro', 'diner',
   'grill',
 ];
 
-// Only the real coffee-shop categories from data/starred-places.json -
-// 'juice' also shows up under categorize.js's broader CAFE_TYPES bucket but
-// juice bars aren't coffee shops, so left out here on purpose.
-const COFFEE_TYPES = ['cafe', 'coffee shop'];
+// Full CAFE_TYPES bucket from categorize.js, including 'juice' and 'health
+// food' - that's Jake's own grouping, used verbatim.
+const CAFE_TYPES = ['cafe', 'coffee shop', 'juice', 'health food'];
+
+const NIGHTLIFE_TYPES = ['bar', 'pub', 'cocktail bar', 'beer hall', 'night club'];
+const FOREST_TYPES = [
+  'veterinarian', 'animal hospital', 'pet store', 'pet groomer',
+  'emergency veterinarian service', 'dog park',
+];
+const VISITED_TYPES = [
+  '3-star hotel', '4-star hotel', '2-star hotel', '4-star tourist hotel',
+  '4-star tourist residence', 'train station', 'international airport',
+  'united kingdom', 'thailand', 'sri lanka', 'mexico', 'france',
+  'united arab emirates', 'utah', 'california', 'hawaii', 'london',
+];
+const OUTDOORS_TYPES = [
+  'hiking area', 'park', 'state park', 'national park', 'mountain peak',
+  'ski resort', 'swimming facility', 'tourist attraction',
+];
+const HEALTH_TYPES = [
+  'medical clinic', 'medical center', 'pharmacy', 'pediatrician', 'doctor',
+  'family practice physician', 'cosmetic dentist', 'skin care clinic',
+  'medical laboratory', 'children\'s hospital',
+];
+const KIDS_TYPES = ['preschool', 'day care center', 'playground'];
+const BEAUTY_TYPES = ['barber shop', 'massage spa', 'beauty supply store'];
+const SHOPPING_TYPES = [
+  'clothing store', 'furniture store', 'nut store', 'market',
+  'fresh food market', 'supermarket', 'cannabis store', 'tesla showroom',
+];
+const ERRANDS_TYPES = [
+  'self-storage facility', 'parking lot', 'bus ticket agency',
+  'shipping and mailing service', 'office space rental agency',
+  'commercial real estate agency', 'real estate agent', 'registration office',
+  'interior plant service', 'audio visual equipment supplier', 'car wash',
+];
+const FITNESS_TYPES = ['fitness center'];
+const GOING_OUT_TYPES = ['event venue', 'movie theater', 'wedding venue', 'event planner'];
+const ASHRAMS_TYPES = ['non-profit organization', 'buddhist temple', 'community center'];
+const DESKS_TYPES = ['software company', 'corporate office'];
 
 // "$20-70 · Italian" -> "italian"; "Medical clinic" -> "medical clinic"
 function extractType(rawCategory) {
@@ -69,7 +124,72 @@ function isTargetMatch(rawCategory) {
 
 function isCoffeeMatch(rawCategory) {
   const type = extractType(rawCategory);
-  return !!type && COFFEE_TYPES.includes(type);
+  return !!type && CAFE_TYPES.includes(type);
+}
+
+function isNightlifeMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && NIGHTLIFE_TYPES.includes(type);
+}
+
+function isForestMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && FOREST_TYPES.includes(type);
+}
+
+function isVisitedMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && VISITED_TYPES.includes(type);
+}
+
+function isOutdoorsMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && OUTDOORS_TYPES.includes(type);
+}
+
+function isHealthMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && HEALTH_TYPES.includes(type);
+}
+
+function isKidsMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && KIDS_TYPES.includes(type);
+}
+
+function isBeautyMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && BEAUTY_TYPES.includes(type);
+}
+
+function isShoppingMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && SHOPPING_TYPES.includes(type);
+}
+
+function isErrandsMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && ERRANDS_TYPES.includes(type);
+}
+
+function isFitnessMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && FITNESS_TYPES.includes(type);
+}
+
+function isGoingOutMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && GOING_OUT_TYPES.includes(type);
+}
+
+function isAshramsMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && ASHRAMS_TYPES.includes(type);
+}
+
+function isDesksMatch(rawCategory) {
+  const type = extractType(rawCategory);
+  return !!type && DESKS_TYPES.includes(type);
 }
 
 const skipped = [];
@@ -319,6 +439,162 @@ async function processStarred() {
         return processStarred();
       }
       console.log(`Failed to add ${key} to ${COFFEE_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isNightlifeMatch(rawCategory)) {
+      console.log(`Adding to ${NIGHTLIFE_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, NIGHTLIFE_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: NIGHTLIFE_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${NIGHTLIFE_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isForestMatch(rawCategory)) {
+      console.log(`Adding to ${FOREST_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, FOREST_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: FOREST_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${FOREST_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isVisitedMatch(rawCategory)) {
+      console.log(`Adding to ${VISITED_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, VISITED_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: VISITED_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${VISITED_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isOutdoorsMatch(rawCategory)) {
+      console.log(`Adding to ${OUTDOORS_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, OUTDOORS_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: OUTDOORS_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${OUTDOORS_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isHealthMatch(rawCategory)) {
+      console.log(`Adding to ${HEALTH_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, HEALTH_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: HEALTH_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${HEALTH_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isKidsMatch(rawCategory)) {
+      console.log(`Adding to ${KIDS_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, KIDS_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: KIDS_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${KIDS_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isBeautyMatch(rawCategory)) {
+      console.log(`Adding to ${BEAUTY_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, BEAUTY_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: BEAUTY_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${BEAUTY_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isShoppingMatch(rawCategory)) {
+      console.log(`Adding to ${SHOPPING_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, SHOPPING_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: SHOPPING_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${SHOPPING_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isErrandsMatch(rawCategory)) {
+      console.log(`Adding to ${ERRANDS_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, ERRANDS_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: ERRANDS_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${ERRANDS_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isFitnessMatch(rawCategory)) {
+      console.log(`Adding to ${FITNESS_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, FITNESS_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: FITNESS_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${FITNESS_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isGoingOutMatch(rawCategory)) {
+      console.log(`Adding to ${GOING_OUT_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, GOING_OUT_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: GOING_OUT_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${GOING_OUT_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isAshramsMatch(rawCategory)) {
+      console.log(`Adding to ${ASHRAMS_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, ASHRAMS_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: ASHRAMS_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${ASHRAMS_LIST_LABEL}, leaving in place for manual review`);
+      skipped.push({ name: key, rawCategory });
+      continue;
+    }
+
+    if (isDesksMatch(rawCategory)) {
+      console.log(`Adding to ${DESKS_LIST_LABEL}: ${key} [${rawCategory}]`);
+      const added = await addToList(row, DESKS_LIST_LABEL);
+      if (added) {
+        moved.push({ name: key, rawCategory, targetLabel: DESKS_LIST_LABEL });
+        return processStarred();
+      }
+      console.log(`Failed to add ${key} to ${DESKS_LIST_LABEL}, leaving in place for manual review`);
       skipped.push({ name: key, rawCategory });
       continue;
     }
