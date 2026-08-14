@@ -40,6 +40,13 @@ scripts call their own `async function main() {...}; main();` at the bottom).
   truth for "what real category strings exist in Jake's data and which bucket they
   belong to" — `move-script.js`'s category constants should be derived from here,
   not guessed or copied from generic Google Maps category lists.
+- `scripts/plan.js` — offline Node tool (`node scripts/plan.js`), no browser
+  involved. Applies `move-script.js`'s exact category constants (not
+  `categorize.js`'s) to `data/starred-places.json` and writes the expected
+  target list for every place to `data/plan.json` (gitignored). Pure
+  derivation, never hand-edited — re-run any time `data/starred-places.json`
+  or `move-script.js`'s category constants change. This is the offline
+  preview of what a live `processStarred()` run would move where.
 - `data/starred-places.json` — gitignored. Real scraped personal data (home/work
   addresses, medical providers, kids' school, etc.). Never commit it, never print
   its full contents into anything that gets committed or shared.
