@@ -153,7 +153,7 @@ Save-dialog or list-scrolling logic in `move-script.js`.
   working-tree changes with a `wip(auto): ...` message. Seeing commits you don't
   remember making is expected, not a sign of a conflicting process — read the diff
   before assuming anything is wrong.
-- `NEXT-STEPS.md` is that same automation's own scratch file — gitignored on
-  purpose (see `.gitignore` comment), don't un-ignore it.
+- `.claude/IN_PROGRESS.md` is where that automation (and close-out) record open
+  decisions and code-state notes — gitignored on purpose, never commit it.
 - Never commit `data/` (real personal data) or `.playwright-mcp/` (local debugging
   artifacts).
