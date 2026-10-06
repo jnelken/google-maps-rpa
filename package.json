@@ -1,0 +1,9 @@
+{
+  "name": "google-maps-rpa",
+  "private": true,
+  "description": "Browser-console scripts for reorganizing Google Maps saved places. No dependencies.",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check move-script.js && node --check place-search-script.js && node --check scripts/plan.js && node --check scripts/categorize.js"
+  }
+}
