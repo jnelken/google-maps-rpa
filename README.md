@@ -87,11 +87,48 @@ Maps quirk — the Save dialog's checkbox for `Starred places` can report a
 stale/wrong checked state on first paint for a large (200+ item) list, which
 made a single-pass "uncheck source, check target" approach unsafe. Splitting
 into add-then-sweep, with a close-and-reopen-the-dialog step before trusting
-any checked-state read, worked around it.
+any checked-state read, worked around it. (Later testing found that clicking
+the page doesn't actually close the Save menu, and that only a full page
+reload gives a trustworthy read — see the per-place route below.)
 
 Both phases have been run live end-to-end against a real account and
 verified via a fresh page reload (not just in-session state) — confirmed
 correctly adding to `Restaurants`/`Archived` without touching `Starred
 places`, and confirmed correctly removing from `Starred places` afterward.
+
+# Per-place search (when the list page won't navigate)
+
+Sometimes Google Maps' in-page navigation stops working: clicking a list or a
+row only highlights it, and the panel never changes. `move-script.js` can't
+work then, because it opens places from the list page.
+`place-search-script.js` never uses the list page. It loads
+`google.com/maps/search/<place name>` for each place, which opens the place
+page directly, and uses that page's Save menu. Same two phases and the same
+safety order: phase 1 only adds, and phase 2 removes a place from `Starred
+places` only after a fresh load shows it in the target list. If anything goes
+wrong, a place ends up in both lists, never in neither.
+
+1. Build the queue offline: `node scripts/plan.js`, then
+   `pbcopy < data/plan.json` (personal data — keep it out of git).
+2. On any `google.com/maps` tab, paste `place-search-script.js` into the
+   Console, then run `gmps.load(<paste>)` and `gmps.start(1)`.
+3. Every place takes a full page load, which clears the Console. After each
+   load, run
+   `window.gmps = (0,eval)(localStorage.getItem('__gmpsSrc'))(); gmps.resume();`
+   to carry on, or install the file as a Tampermonkey/Violentmonkey
+   userscript so it resumes by itself.
+4. Each place is checked before anything is clicked: the page title has to
+   match the queued name, and the place has to still be in `Starred places`.
+   Anything that doesn't match is skipped and logged. `gmps.status()` shows
+   progress and skips; `gmps.stop()` halts.
+5. When phase 1 reports complete, check the target lists, then run
+   `gmps.start(2)` and resume the same way after each load.
+
+Progress is saved in the tab's `localStorage`, so you can stop, reload, or
+rerun at any time and finished places are skipped. `gmps.retry()` re-queues
+the skipped ones. This route has been unit-tested and reviewed but not yet run
+live end-to-end; watch the first few places closely.
+
+`npm test` runs the dependency-free unit tests for its logic.
 
 Made by [@seifip](https://twitter.com/seifip) 

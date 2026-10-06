@@ -13,18 +13,34 @@ meant to be copy-pasted whole into the Chrome DevTools console on a live
 `google.com/maps` tab and run directly (ES2017+, top-level `await` not required —
 scripts call their own `async function main() {...}; main();` at the bottom).
 
+`package.json` exists only for dependency-free checks: `npm test` (Node's built-in
+`node --test`, covering `place-search-script.js`'s pure logic) and `npm run check`
+(`node --check` on every script). Keep it dependency-free.
+
 ## Files
 
 - `probe-script.js` — read-only. Prints a table of currently-rendered rows in
   whatever list is open (name, raw category, closed/broken flags). Never clicks
   anything. Use this first whenever DOM selectors might have drifted, before trusting
   any list-modifying script.
-- `move-script.js` — the main tool. Two-phase: `processStarred()` adds
+- `move-script.js` — the list-page tool. Two-phase: `processStarred()` adds
   category-matched places from `Starred places` into topic lists (without touching
   Starred places membership), `sweepRemoveFromStarred()` removes confirmed adds from
   Starred places afterward. See its own header comment for the current category →
   list mapping and validation status — that comment is kept up to date by whoever
-  last touched the file, trust it over this doc for the current state.
+  last touched the file, trust it over this doc for the current state. It needs
+  Google Maps' in-app (SPA) navigation to open rows, and its Save-dialog selectors
+  (`.closest('[aria-checked]')`, `document.body.click()`) predate the 2026-08
+  findings below — expect it to fail while SPA nav is broken.
+- `place-search-script.js` — the per-place-search tool, for when SPA navigation is
+  broken. Never touches the list page: it full-page-loads
+  `google.com/maps/search/<name>` for each place queued from `data/plan.json` and
+  toggles the Save menu there, one toggle per load. Same two-phase safety as
+  `move-script.js` (phase 1 adds, phase 2 removes Starred only after a fresh load
+  confirms the target). Resumable: state lives in `localStorage.__gmps`, and the
+  script stores its own source in `localStorage.__gmpsSrc` so a one-liner reloads it
+  after each navigation (or install it as a userscript). Pure logic is exported for
+  `place-search-script.test.js`. Statically reviewed only — not yet run live.
 - `console-script.js` — the original, older single-pass script (moves Want to go
   items into Food/Coffee/Bakery/Dessert). Its Save-dialog interaction selectors were
   the starting point for `move-script.js` but were largely re-verified/fixed since;
@@ -79,10 +95,11 @@ trigger the underlying handler (see gotchas).
   across sessions: `document.querySelectorAll('*')` text-match + `.closest('button')`
   + `.click()`, ref-based clicks, and real coordinate clicks have all, on different
   occasions, either worked fine or silently done nothing (row just highlights, no
-  navigation, `.BsJqK`/`h1` stay empty). Root cause not identified. If it doesn't
-  work: try the left sidebar's persistent "Saved" tab, or search for the list by
-  name directly in the main search box, instead of retrying the same click — this
-  has been a fresh 30+ minute dead end more than once.
+  navigation, `.BsJqK`/`h1` stay empty). Likely root cause (2026-08-09): Google
+  Maps' whole SPA navigation breaks in some browser sessions — the tab *title*
+  updates while the DOM, `location` and panel never change. Full page loads still
+  work. Don't retry the same click: switch to `place-search-script.js`, which never
+  needs the list page — this has been a fresh 30+ minute dead end more than once.
 
 These cost real debugging time across multiple sessions. Read before touching the
 Save-dialog or list-scrolling logic in `move-script.js`.
@@ -92,20 +109,35 @@ Save-dialog or list-scrolling logic in `move-script.js`.
   element is `row.querySelector('.fontHeadlineSmall').closest('button')`. Confirmed
   live by inspecting the real row HTML the user pasted in — don't re-derive this
   from guesswork, it required seeing the real markup.
-- **Checkbox click target**: inside the Save dialog, click
-  `element.closest('[aria-checked="..."]')`, never `element.parentElement`. Google's
-  jsaction handlers bind at specific nesting depths — a sibling div can carry its
-  own unrelated jsaction (e.g. a photo-viewer trigger), so clicking "some nearby
-  parent" is not reliable; you have to click the element that actually owns the
-  `aria-checked` attribute.
+- **Save-menu click targets (confirmed live 2026-08-09, supersedes the older
+  `.closest('[aria-checked]')` note that `move-script.js` still follows).** Open the
+  menu by JS-clicking `[data-value*="Save"]`, then poll for
+  `[role="menu"][aria-label="Save in your lists"]`. Each list is an `[aria-checked]`
+  row. To **add**, JS-click the row's inner `.mLuXec` label div — clicking the
+  `[aria-checked]` row itself does nothing. To **remove**, JS-click the checked
+  row's `.r5q4Qd` check-icon span — `.mLuXec` on an already-checked row is a silent
+  no-op. Never click "some nearby parent": Google's jsaction handlers bind at
+  specific nesting depths and sibling divs carry unrelated jsactions.
+- **Real mouse clicks and key presses don't activate Maps' jsaction handlers** (the
+  `computer` tool only hovers/highlights). Everything has to be a JS `.click()`.
+- **The Save menu is one-shot.** After any toggle it closes and the Save button goes
+  inert until a full page reload — one toggle per page load, so add-then-unstar
+  needs two loads. `document.body.click()` does **not** close the menu.
+- **Wait ~5.5s after a toggle before navigating away**, or the save is cancelled in
+  flight (observed: an add that reported success silently didn't persist).
+- **The Save button label is a cheap state check:** `Saved` = 1 list, `Saved (2)` =
+  2 lists, etc.
 - **Checkbox state reads are unreliable close to a state change.** Confirmed live,
   repeatedly, against a 200+ item list: a place visibly already in a list can still
   show `aria-checked="false"` the instant the Save dialog opens, and polling
   `aria-checked` immediately after clicking a checkbox can report a false negative
   even though the click genuinely worked (Google re-sorts checked items to the top
-  of the dialog, and the DOM node you're polling can be mid-reorder/replaced). The
-  only reliable pattern found: close the dialog (`document.body.click()`), wait,
-  reopen it, *then* read. Never trust a same-paint read.
+  of the dialog, and the DOM node you're polling can be mid-reorder/replaced). Server
+  sync also lags the UI: a fresh reload right after an add can still read unchecked,
+  then read checked a load later. The reliable pattern is a fresh page load before
+  any read you act on (the older "close with `document.body.click()` and reopen"
+  advice doesn't work — that click doesn't close the menu). Never trust a same-paint
+  read, and treat a single unconfirmed read as "retry later", not "failed".
 - **`returnToList()` must detect layout, not assume it.** Google Maps renders place
   details two different ways depending on window width: one fully replaces the list
   panel with the place's own page (needs a "Back" click to return), the other shows
