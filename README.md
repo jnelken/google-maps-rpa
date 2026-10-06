@@ -116,7 +116,8 @@ wrong, a place ends up in both lists, never in neither.
    load, run
    `window.gmps = (0,eval)(localStorage.getItem('__gmpsSrc'))(); gmps.resume();`
    to carry on, or install the file as a Tampermonkey/Violentmonkey
-   userscript so it resumes by itself.
+   userscript so it resumes by itself. Only the tab where you ran
+   `gmps.start()` carries on; other open Maps tabs are left alone.
 4. Each place is checked before anything is clicked: the page title has to
    match the queued name, and the place has to still be in `Starred places`.
    Anything that doesn't match is skipped and logged. A name search can't

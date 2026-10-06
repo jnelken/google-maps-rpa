@@ -42,7 +42,9 @@
 //   5. When phase 1 reports complete, check the target lists, then
 //      gmps.start(2) and resume the same way.
 //   gmps.status() prints progress, gmps.stop() halts, gmps.retry() re-queues
-//   skipped places for the current phase.
+//   skipped places for the current phase. Only the tab that ran gmps.start()
+//   resumes (a per-tab sessionStorage token), so other open Maps tabs are
+//   left alone; run gmps.start() in another tab to move the run there.
 //
 // VALIDATION STATUS (2026-10): the Save-menu mechanics below were confirmed
 // live on 2026-08-09 with a hand-driven version of this flow. This script
@@ -52,6 +54,7 @@
 function gmPlaceSearch() {
   const STATE_KEY = '__gmps';
   const SRC_KEY = '__gmpsSrc';
+  const OWNER_KEY = '__gmpsOwner';
   const SOURCE_LIST_LABEL = 'Starred places';
   const MAX_TRIES = 3;
   // Navigating away sooner than this after a toggle cancels the save in
@@ -64,8 +67,6 @@ function gmPlaceSearch() {
   // one we navigated to (user wandered off, tab was restored later). Generous
   // because a human may take a while to paste the resume one-liner.
   const STALE_NAV_MS = 15 * 60 * 1000;
-  const MIN_PREFIX_MATCH_LENGTH = 4;
-
   const DONE_STATUSES = {
     1: ['added', 'already-in-target'],
     2: ['removed', 'already-removed'],
@@ -84,16 +85,12 @@ function gmPlaceSearch() {
       .trim();
   }
 
-  // Same normalized name, or the page name is the queued name plus trailing
-  // whole words (a branch suffix like "Blue Bottle Coffee - Hayes Valley").
-  // Never the reverse: a queued branch name must not accept the generic
-  // place. Partial overlap ("Joe's Pizza" vs "Joe's Coffee") never matches.
+  // Exact match after normalizing case, accents and punctuation only. Any
+  // looser rule ("Notion" vs "Notion Labs") can accept a different starred
+  // place and later unstar it; a near-miss is skipped for manual handling.
   function namesMatch(expected, actual) {
     const ne = normalizeName(expected);
-    const na = normalizeName(actual);
-    if (!ne || !na) return false;
-    if (ne === na) return true;
-    return ne.length >= MIN_PREFIX_MATCH_LENGTH && na.startsWith(ne + ' ');
+    return !!ne && ne === normalizeName(actual);
   }
 
   function placeKey(item) {
@@ -107,18 +104,18 @@ function gmPlaceSearch() {
   // Accepts data/plan.json rows (or bare { name, target } objects) and keeps
   // only places with a target list. A name search can't tell two places with
   // the same name apart (the plan has no address or place ID), so every name
-  // that appears more than once is left out of the queue for manual handling.
+  // that appears more than once in the plan - targeted or not - is left out
+  // of the queue for manual handling.
   function buildQueue(planRows) {
     if (!Array.isArray(planRows)) throw new Error('expected an array of plan rows');
     const items = [];
     const counts = new Map();
     for (const row of planRows) {
       if (!row || typeof row.name !== 'string' || !row.name.trim()) continue;
-      if (typeof row.target !== 'string' || !row.target.trim()) continue;
-      const item = { name: row.name.trim(), target: row.target.trim() };
-      const norm = normalizeName(item.name);
+      const norm = normalizeName(row.name);
       counts.set(norm, (counts.get(norm) || 0) + 1);
-      items.push(item);
+      if (typeof row.target !== 'string' || !row.target.trim()) continue;
+      items.push({ name: row.name.trim(), target: row.target.trim() });
     }
     const isAmbiguous = item => counts.get(normalizeName(item.name)) > 1;
     return {
@@ -128,7 +125,7 @@ function gmPlaceSearch() {
   }
 
   function emptyState() {
-    return { queue: [], results: {}, phase: 1, running: false, current: null };
+    return { queue: [], results: {}, phase: 1, running: false, current: null, owner: null };
   }
 
   function phaseResult(state, item, phase) {
@@ -148,9 +145,10 @@ function gmPlaceSearch() {
 
   // The persisted state still expects this page to act on `item` - false
   // once gmps.stop() ran or another tab moved the run on.
-  function isStillCurrent(state, item, phase) {
-    return !!state.running && state.phase === phase && !!state.current
-      && state.current.phase === phase && state.current.key === placeKey(item);
+  // `owner` is this tab's token: only the tab that ran gmps.start() acts.
+  function isStillCurrent(state, item, phase, owner) {
+    return !!state.running && !!owner && state.owner === owner && state.phase === phase
+      && !!state.current && state.current.phase === phase && state.current.key === placeKey(item);
   }
 
   function nextItem(state) {
@@ -229,6 +227,19 @@ function gmPlaceSearch() {
 
   function saveState(state) {
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  }
+
+  // localStorage is shared by every google.com tab, but sessionStorage is
+  // per tab and survives this tab's own navigations - so a token kept there
+  // stops other open Maps tabs (and their userscript copies) from acting.
+  function tabOwner() {
+    return sessionStorage.getItem(OWNER_KEY);
+  }
+
+  function claimTab() {
+    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem(OWNER_KEY, token);
+    return token;
   }
 
   function delay(ms) {
@@ -338,7 +349,7 @@ function gmPlaceSearch() {
     const decide = phase === 1 ? decidePhase1 : decidePhase2;
     let { action, status } = decide({ expectedName: item.name, h1, menu });
 
-    if (!isStillCurrent(loadState(), item, phase)) {
+    if (!isStillCurrent(loadState(), item, phase, tabOwner())) {
       console.log(`gmps: run stopped or moved on while ${item.name} loaded - not touching it`);
       return null;
     }
@@ -359,7 +370,7 @@ function gmPlaceSearch() {
   async function resume() {
     if (window.__gmpsActive) return;
     const state = loadState();
-    if (!state.running) return;
+    if (!state.running || !tabOwner() || state.owner !== tabOwner()) return;
     window.__gmpsActive = true;
     try {
       const { current } = state;
@@ -401,7 +412,7 @@ function gmPlaceSearch() {
       console.log('gmps: queue is empty - run gmps.load(<data/plan.json>) first');
       return;
     }
-    saveState(state);
+    saveState({ ...state, owner: claimTab() });
     resume();
   }
 

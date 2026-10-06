@@ -9,13 +9,20 @@ const vm = require('node:vm');
 
 const SOURCE = fs.readFileSync(path.join(__dirname, 'place-search-script.js'), 'utf8');
 
-function createBrowser({ h1 = 'Test Cafe', lists, onSaveClick = () => {} }) {
-  const store = {};
-  const localStorage = {
+function createStorage(store = {}) {
+  return {
+    store,
     getItem: key => (key in store ? store[key] : null),
     setItem: (key, value) => { store[key] = String(value); },
     removeItem: key => { delete store[key]; },
   };
+}
+
+// One browser tab. Pass `localStorage` to share the origin's storage with
+// another tab; sessionStorage is always per tab.
+function createBrowser({ h1 = 'Test Cafe', lists, onSaveClick = () => {}, localStorage = createStorage() }) {
+  const { store } = localStorage;
+  const sessionStorage = createStorage();
   const clicks = [];
   const navigations = [];
   let currentLists = lists;
@@ -46,6 +53,7 @@ function createBrowser({ h1 = 'Test Cafe', lists, onSaveClick = () => {} }) {
     menuOpen = false;
     page = {
       localStorage,
+      sessionStorage,
       console: { log() {}, table() {} },
       setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms, 2)),
       document,
@@ -121,6 +129,26 @@ test('a wrong search result is skipped without any toggle', async () => {
   await browser.reloadAndResume();
   assert.deepEqual(browser.clicks, []);
   assert.equal(browser.state().results[KEY].p1.status, 'name-mismatch');
+});
+
+test('only the tab that started the run resumes it', async () => {
+  const shared = createStorage();
+  const lists = [['Starred places', true], ['Coffee Shops', false]];
+  const owner = createBrowser({ lists, localStorage: shared });
+  const other = createBrowser({ h1: 'Unrelated Place', lists, localStorage: shared });
+  owner.pasteScript().load([{ name: 'Test Cafe', target: 'Coffee Shops' }]);
+  owner.gmps.start(1);
+  await settle();
+
+  other.pasteScript();
+  await other.reloadAndResume();
+  assert.deepEqual(other.clicks, []);
+  assert.deepEqual(other.navigations, []);
+  assert.equal(owner.state().results[KEY], undefined);
+
+  await owner.reloadAndResume();
+  assert.deepEqual(owner.clicks, ['add:Coffee Shops']);
+  assert.equal(owner.state().results[KEY].p1.status, 'added');
 });
 
 test('gmps.stop() while a page is loading prevents the toggle and stays stopped', async () => {

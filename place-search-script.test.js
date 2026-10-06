@@ -16,10 +16,15 @@ test('normalizeName strips accents, punctuation and case', () => {
   assert.equal(gmps.normalizeName(null), '');
 });
 
-test('namesMatch accepts identical names and branch suffixes', () => {
+test('namesMatch accepts names equal after normalizing', () => {
   assert.ok(gmps.namesMatch('Blue Bottle Coffee', 'Blue Bottle Coffee'));
-  assert.ok(gmps.namesMatch('Blue Bottle Coffee', 'Blue Bottle Coffee - Hayes Valley'));
   assert.ok(gmps.namesMatch('Café de Flore', 'Cafe de Flore'));
+  assert.ok(gmps.namesMatch('Joe’s Pizza', "JOE'S PIZZA"));
+});
+
+test('namesMatch rejects branch suffixes in either direction', () => {
+  assert.ok(!gmps.namesMatch('Blue Bottle Coffee', 'Blue Bottle Coffee - Hayes Valley'));
+  assert.ok(!gmps.namesMatch('Notion', 'Notion Labs'));
 });
 
 test('namesMatch rejects unrelated search results', () => {
@@ -35,14 +40,9 @@ test('namesMatch rejects different places that share words', () => {
   assert.ok(!gmps.namesMatch('The Grill', 'The Grille Room'));
 });
 
-test('namesMatch only lets the page name extend the queued name', () => {
+test('namesMatch rejects a generic page for a queued branch name', () => {
   assert.ok(!gmps.namesMatch('Blue Bottle Coffee - Hayes Valley', 'Blue Bottle Coffee'));
   assert.ok(!gmps.namesMatch('Starbucks Reserve Roastery', 'Starbucks'));
-});
-
-test('namesMatch does not treat a short fragment as a prefix match', () => {
-  assert.ok(!gmps.namesMatch('Bar', 'Bar Luce Fondazione Prada Milano'));
-  assert.ok(!gmps.namesMatch('Blue', 'Blueberry Hill'));
 });
 
 test('searchUrl encodes the place name', () => {
@@ -73,6 +73,15 @@ test('buildQueue leaves out every place whose name repeats', () => {
   ]);
   assert.deepEqual(queue, [{ name: 'Diner', target: 'Restaurants' }]);
   assert.equal(ambiguous.length, 3);
+});
+
+test('buildQueue counts untargeted rows when looking for repeated names', () => {
+  const { queue, ambiguous } = gmps.buildQueue([
+    { name: 'Starbucks', target: 'Coffee Shops' },
+    { name: 'Starbucks', target: null, reason: 'no category match' },
+  ]);
+  assert.deepEqual(queue, []);
+  assert.deepEqual(ambiguous, [{ name: 'Starbucks', target: 'Coffee Shops' }]);
 });
 
 test('buildQueue rejects non-array input', () => {
@@ -122,15 +131,22 @@ test('phase 2 only queues places phase 1 added or found already in target', () =
   assert.equal(gmps.nextItem(state), null);
 });
 
-test('isStillCurrent requires a running state pointed at this item and phase', () => {
+test('isStillCurrent requires this tab to own a running state pointed at this item', () => {
   const a = { name: 'A', target: 'Restaurants' };
   const b = { name: 'B', target: 'Restaurants' };
-  const running = { ...stateWith([a, b]), running: true, current: { key: gmps.placeKey(a), phase: 1, at: 1 } };
-  assert.ok(gmps.isStillCurrent(running, a, 1));
-  assert.ok(!gmps.isStillCurrent({ ...running, running: false }, a, 1));
-  assert.ok(!gmps.isStillCurrent({ ...running, current: null }, a, 1));
-  assert.ok(!gmps.isStillCurrent(running, b, 1));
-  assert.ok(!gmps.isStillCurrent({ ...running, phase: 2 }, a, 1));
+  const running = {
+    ...stateWith([a, b]),
+    running: true,
+    owner: 'tab-1',
+    current: { key: gmps.placeKey(a), phase: 1, at: 1 },
+  };
+  assert.ok(gmps.isStillCurrent(running, a, 1, 'tab-1'));
+  assert.ok(!gmps.isStillCurrent(running, a, 1, 'tab-2'));
+  assert.ok(!gmps.isStillCurrent(running, a, 1, null));
+  assert.ok(!gmps.isStillCurrent({ ...running, running: false }, a, 1, 'tab-1'));
+  assert.ok(!gmps.isStillCurrent({ ...running, current: null }, a, 1, 'tab-1'));
+  assert.ok(!gmps.isStillCurrent(running, b, 1, 'tab-1'));
+  assert.ok(!gmps.isStillCurrent({ ...running, phase: 2 }, a, 1, 'tab-1'));
 });
 
 test('recordResult keeps the other phase and counts tries', () => {
