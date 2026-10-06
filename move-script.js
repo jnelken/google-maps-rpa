@@ -117,79 +117,31 @@ function extractType(rawCategory) {
   return parts[parts.length - 1].trim().toLowerCase();
 }
 
-function isTargetMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && RESTAURANT_TYPES.includes(type);
-}
+// Checked in order; the first list whose types include the row's type wins.
+// scripts/plan.js keeps its own copy of this order - change both together.
+const BUCKETS = [
+  [TARGET_LIST_LABEL, RESTAURANT_TYPES],
+  [COFFEE_LIST_LABEL, CAFE_TYPES],
+  [NIGHTLIFE_LIST_LABEL, NIGHTLIFE_TYPES],
+  [FOREST_LIST_LABEL, FOREST_TYPES],
+  [VISITED_LIST_LABEL, VISITED_TYPES],
+  [OUTDOORS_LIST_LABEL, OUTDOORS_TYPES],
+  [HEALTH_LIST_LABEL, HEALTH_TYPES],
+  [KIDS_LIST_LABEL, KIDS_TYPES],
+  [BEAUTY_LIST_LABEL, BEAUTY_TYPES],
+  [SHOPPING_LIST_LABEL, SHOPPING_TYPES],
+  [ERRANDS_LIST_LABEL, ERRANDS_TYPES],
+  [FITNESS_LIST_LABEL, FITNESS_TYPES],
+  [GOING_OUT_LIST_LABEL, GOING_OUT_TYPES],
+  [ASHRAMS_LIST_LABEL, ASHRAMS_TYPES],
+  [DESKS_LIST_LABEL, DESKS_TYPES],
+];
 
-function isCoffeeMatch(rawCategory) {
+function targetFor(rawCategory) {
   const type = extractType(rawCategory);
-  return !!type && CAFE_TYPES.includes(type);
-}
-
-function isNightlifeMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && NIGHTLIFE_TYPES.includes(type);
-}
-
-function isForestMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && FOREST_TYPES.includes(type);
-}
-
-function isVisitedMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && VISITED_TYPES.includes(type);
-}
-
-function isOutdoorsMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && OUTDOORS_TYPES.includes(type);
-}
-
-function isHealthMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && HEALTH_TYPES.includes(type);
-}
-
-function isKidsMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && KIDS_TYPES.includes(type);
-}
-
-function isBeautyMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && BEAUTY_TYPES.includes(type);
-}
-
-function isShoppingMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && SHOPPING_TYPES.includes(type);
-}
-
-function isErrandsMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && ERRANDS_TYPES.includes(type);
-}
-
-function isFitnessMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && FITNESS_TYPES.includes(type);
-}
-
-function isGoingOutMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && GOING_OUT_TYPES.includes(type);
-}
-
-function isAshramsMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && ASHRAMS_TYPES.includes(type);
-}
-
-function isDesksMatch(rawCategory) {
-  const type = extractType(rawCategory);
-  return !!type && DESKS_TYPES.includes(type);
+  if (!type) return null;
+  const bucket = BUCKETS.find(([, types]) => types.includes(type));
+  return bucket ? bucket[0] : null;
 }
 
 const skipped = [];
@@ -407,198 +359,21 @@ async function processStarred() {
       continue;
     }
 
-    if (isPermanentlyClosed) {
-      console.log(`Adding to ${ARCHIVE_LIST_LABEL} (permanently closed): ${key}`);
-      const added = await addToList(row, ARCHIVE_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: ARCHIVE_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${ARCHIVE_LIST_LABEL}, leaving in place for manual review`);
+    const targetLabel = isPermanentlyClosed ? ARCHIVE_LIST_LABEL : targetFor(rawCategory);
+    if (!targetLabel) {
       skipped.push({ name: key, rawCategory });
       continue;
     }
 
-    if (isTargetMatch(rawCategory)) {
-      console.log(`Adding to ${TARGET_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, TARGET_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: TARGET_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${TARGET_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
+    console.log(isPermanentlyClosed
+      ? `Adding to ${ARCHIVE_LIST_LABEL} (permanently closed): ${key}`
+      : `Adding to ${targetLabel}: ${key} [${rawCategory}]`);
+    const added = await addToList(row, targetLabel);
+    if (added) {
+      moved.push({ name: key, rawCategory, targetLabel });
+      return processStarred();
     }
-
-    if (isCoffeeMatch(rawCategory)) {
-      console.log(`Adding to ${COFFEE_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, COFFEE_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: COFFEE_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${COFFEE_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isNightlifeMatch(rawCategory)) {
-      console.log(`Adding to ${NIGHTLIFE_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, NIGHTLIFE_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: NIGHTLIFE_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${NIGHTLIFE_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isForestMatch(rawCategory)) {
-      console.log(`Adding to ${FOREST_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, FOREST_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: FOREST_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${FOREST_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isVisitedMatch(rawCategory)) {
-      console.log(`Adding to ${VISITED_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, VISITED_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: VISITED_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${VISITED_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isOutdoorsMatch(rawCategory)) {
-      console.log(`Adding to ${OUTDOORS_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, OUTDOORS_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: OUTDOORS_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${OUTDOORS_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isHealthMatch(rawCategory)) {
-      console.log(`Adding to ${HEALTH_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, HEALTH_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: HEALTH_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${HEALTH_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isKidsMatch(rawCategory)) {
-      console.log(`Adding to ${KIDS_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, KIDS_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: KIDS_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${KIDS_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isBeautyMatch(rawCategory)) {
-      console.log(`Adding to ${BEAUTY_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, BEAUTY_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: BEAUTY_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${BEAUTY_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isShoppingMatch(rawCategory)) {
-      console.log(`Adding to ${SHOPPING_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, SHOPPING_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: SHOPPING_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${SHOPPING_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isErrandsMatch(rawCategory)) {
-      console.log(`Adding to ${ERRANDS_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, ERRANDS_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: ERRANDS_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${ERRANDS_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isFitnessMatch(rawCategory)) {
-      console.log(`Adding to ${FITNESS_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, FITNESS_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: FITNESS_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${FITNESS_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isGoingOutMatch(rawCategory)) {
-      console.log(`Adding to ${GOING_OUT_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, GOING_OUT_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: GOING_OUT_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${GOING_OUT_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isAshramsMatch(rawCategory)) {
-      console.log(`Adding to ${ASHRAMS_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, ASHRAMS_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: ASHRAMS_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${ASHRAMS_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
-    if (isDesksMatch(rawCategory)) {
-      console.log(`Adding to ${DESKS_LIST_LABEL}: ${key} [${rawCategory}]`);
-      const added = await addToList(row, DESKS_LIST_LABEL);
-      if (added) {
-        moved.push({ name: key, rawCategory, targetLabel: DESKS_LIST_LABEL });
-        return processStarred();
-      }
-      console.log(`Failed to add ${key} to ${DESKS_LIST_LABEL}, leaving in place for manual review`);
-      skipped.push({ name: key, rawCategory });
-      continue;
-    }
-
+    console.log(`Failed to add ${key} to ${targetLabel}, leaving in place for manual review`);
     skipped.push({ name: key, rawCategory });
   }
 
