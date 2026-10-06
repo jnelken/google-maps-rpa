@@ -84,17 +84,16 @@ function gmPlaceSearch() {
       .trim();
   }
 
-  // Same normalized name, or one is the other plus trailing whole words (a
-  // branch suffix like "Blue Bottle Coffee - Hayes Valley"). Partial overlap
-  // ("Joe's Pizza" vs "Joe's Coffee") is a different place and never matches.
+  // Same normalized name, or the page name is the queued name plus trailing
+  // whole words (a branch suffix like "Blue Bottle Coffee - Hayes Valley").
+  // Never the reverse: a queued branch name must not accept the generic
+  // place. Partial overlap ("Joe's Pizza" vs "Joe's Coffee") never matches.
   function namesMatch(expected, actual) {
     const ne = normalizeName(expected);
     const na = normalizeName(actual);
     if (!ne || !na) return false;
     if (ne === na) return true;
-    const shorter = ne.length <= na.length ? ne : na;
-    const longer = shorter === ne ? na : ne;
-    return shorter.length >= MIN_PREFIX_MATCH_LENGTH && longer.startsWith(shorter + ' ');
+    return ne.length >= MIN_PREFIX_MATCH_LENGTH && na.startsWith(ne + ' ');
   }
 
   function placeKey(item) {
@@ -145,6 +144,13 @@ function gmPlaceSearch() {
     const result = phaseResult(state, item, phase);
     if (!result) return true;
     return RETRYABLE_STATUSES.includes(result.status) && result.tries < MAX_TRIES;
+  }
+
+  // The persisted state still expects this page to act on `item` - false
+  // once gmps.stop() ran or another tab moved the run on.
+  function isStillCurrent(state, item, phase) {
+    return !!state.running && state.phase === phase && !!state.current
+      && state.current.phase === phase && state.current.key === placeKey(item);
   }
 
   function nextItem(state) {
@@ -328,8 +334,14 @@ function gmPlaceSearch() {
       menuEl = await openSaveMenu();
       if (menuEl) menu = readMenu(menuEl, item.target);
     }
-    const decide = state.phase === 1 ? decidePhase1 : decidePhase2;
+    const phase = state.phase;
+    const decide = phase === 1 ? decidePhase1 : decidePhase2;
     let { action, status } = decide({ expectedName: item.name, h1, menu });
+
+    if (!isStillCurrent(loadState(), item, phase)) {
+      console.log(`gmps: run stopped or moved on while ${item.name} loaded - not touching it`);
+      return null;
+    }
 
     let toggled = false;
     if (action === 'add-target') toggled = toggleOnce(menuEl, item.target, 'add');
@@ -337,10 +349,11 @@ function gmPlaceSearch() {
     if ((action === 'add-target' || action === 'remove-source') && !toggled) status = 'menu-timeout';
 
     console.log(`gmps: ${item.name} -> ${status}${h1 && status === 'name-mismatch' ? ` (page shows "${h1}")` : ''}`);
-    const next = { ...recordResult(state, item, state.phase, status, Date.now()), current: null };
-    saveState(next);
+    // Record onto the freshest persisted state so a stop() that lands
+    // mid-page isn't overwritten with this page's stale `running: true`.
+    saveState({ ...recordResult(loadState(), item, phase, status, Date.now()), current: null });
     await delay(toggled ? POST_TOGGLE_WAIT_MS : POST_SKIP_WAIT_MS);
-    return next;
+    return loadState();
   }
 
   async function resume() {
@@ -363,7 +376,7 @@ function gmPlaceSearch() {
         return;
       }
       const after = await actOnCurrentPage(state, item);
-      if (loadState().running) advance(after);
+      if (after && after.running) advance(after);
     } finally {
       window.__gmpsActive = false;
     }
@@ -427,6 +440,7 @@ function gmPlaceSearch() {
     searchUrl,
     buildQueue,
     emptyState,
+    isStillCurrent,
     nextItem,
     recordResult,
     clearSkipped,

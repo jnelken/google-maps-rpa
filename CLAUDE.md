@@ -14,7 +14,8 @@ meant to be copy-pasted whole into the Chrome DevTools console on a live
 scripts call their own `async function main() {...}; main();` at the bottom).
 
 `package.json` exists only for dependency-free checks: `npm test` (Node's built-in
-`node --test`, covering `place-search-script.js`'s pure logic) and `npm run check`
+`node --test`, covering `place-search-script.js`'s pure logic plus a fake-page run
+of its browser path in `place-search-script.page.test.js`) and `npm run check`
 (`node --check` on every script). Keep it dependency-free.
 
 ## Files

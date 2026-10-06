@@ -35,6 +35,11 @@ test('namesMatch rejects different places that share words', () => {
   assert.ok(!gmps.namesMatch('The Grill', 'The Grille Room'));
 });
 
+test('namesMatch only lets the page name extend the queued name', () => {
+  assert.ok(!gmps.namesMatch('Blue Bottle Coffee - Hayes Valley', 'Blue Bottle Coffee'));
+  assert.ok(!gmps.namesMatch('Starbucks Reserve Roastery', 'Starbucks'));
+});
+
 test('namesMatch does not treat a short fragment as a prefix match', () => {
   assert.ok(!gmps.namesMatch('Bar', 'Bar Luce Fondazione Prada Milano'));
   assert.ok(!gmps.namesMatch('Blue', 'Blueberry Hill'));
@@ -115,6 +120,17 @@ test('phase 2 only queues places phase 1 added or found already in target', () =
   assert.equal(gmps.nextItem(state), already);
   state = gmps.recordResult(state, already, 2, 'already-removed', 2);
   assert.equal(gmps.nextItem(state), null);
+});
+
+test('isStillCurrent requires a running state pointed at this item and phase', () => {
+  const a = { name: 'A', target: 'Restaurants' };
+  const b = { name: 'B', target: 'Restaurants' };
+  const running = { ...stateWith([a, b]), running: true, current: { key: gmps.placeKey(a), phase: 1, at: 1 } };
+  assert.ok(gmps.isStillCurrent(running, a, 1));
+  assert.ok(!gmps.isStillCurrent({ ...running, running: false }, a, 1));
+  assert.ok(!gmps.isStillCurrent({ ...running, current: null }, a, 1));
+  assert.ok(!gmps.isStillCurrent(running, b, 1));
+  assert.ok(!gmps.isStillCurrent({ ...running, phase: 2 }, a, 1));
 });
 
 test('recordResult keeps the other phase and counts tries', () => {
