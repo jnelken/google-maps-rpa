@@ -28,27 +28,46 @@ test('namesMatch rejects unrelated search results', () => {
   assert.ok(!gmps.namesMatch('Blue Bottle Coffee', ''));
 });
 
-test('namesMatch does not treat a short fragment as containment', () => {
+test('namesMatch rejects different places that share words', () => {
+  assert.ok(!gmps.namesMatch('Joe’s Pizza', 'Joe’s Coffee'));
+  assert.ok(!gmps.namesMatch('Blue Bottle Coffee', 'Blue Door Coffee'));
+  assert.ok(!gmps.namesMatch('Hayes Valley Bakery', 'Blue Bottle Coffee Hayes Valley'));
+  assert.ok(!gmps.namesMatch('The Grill', 'The Grille Room'));
+});
+
+test('namesMatch does not treat a short fragment as a prefix match', () => {
   assert.ok(!gmps.namesMatch('Bar', 'Bar Luce Fondazione Prada Milano'));
+  assert.ok(!gmps.namesMatch('Blue', 'Blueberry Hill'));
 });
 
 test('searchUrl encodes the place name', () => {
   assert.equal(gmps.searchUrl('A & B/C'), 'https://www.google.com/maps/search/A%20%26%20B%2FC');
 });
 
-test('buildQueue keeps targeted rows, trims and dedupes', () => {
-  const queue = gmps.buildQueue([
-    { index: 0, name: ' Cafe ', target: 'Coffee Shops', reason: 'cafe' },
+test('buildQueue keeps targeted rows and trims names', () => {
+  const { queue, ambiguous } = gmps.buildQueue([
+    { index: 0, name: ' Cafe Uno ', target: 'Coffee Shops', reason: 'cafe' },
     { index: 1, name: 'Unmatched', target: null, reason: 'no category match' },
-    { index: 2, name: 'Cafe', target: 'Coffee Shops' },
     { index: 3, name: '', target: 'Restaurants' },
     null,
     { index: 4, name: 'Diner', target: 'Restaurants' },
   ]);
   assert.deepEqual(queue, [
-    { name: 'Cafe', target: 'Coffee Shops' },
+    { name: 'Cafe Uno', target: 'Coffee Shops' },
     { name: 'Diner', target: 'Restaurants' },
   ]);
+  assert.deepEqual(ambiguous, []);
+});
+
+test('buildQueue leaves out every place whose name repeats', () => {
+  const { queue, ambiguous } = gmps.buildQueue([
+    { name: 'Starbucks', target: 'Coffee Shops' },
+    { name: 'Diner', target: 'Restaurants' },
+    { name: 'starbucks', target: 'Coffee Shops' },
+    { name: 'Starbucks', target: 'Errands' },
+  ]);
+  assert.deepEqual(queue, [{ name: 'Diner', target: 'Restaurants' }]);
+  assert.equal(ambiguous.length, 3);
 });
 
 test('buildQueue rejects non-array input', () => {

@@ -64,7 +64,7 @@ function gmPlaceSearch() {
   // one we navigated to (user wandered off, tab was restored later). Generous
   // because a human may take a while to paste the resume one-liner.
   const STALE_NAV_MS = 15 * 60 * 1000;
-  const NAME_MATCH_THRESHOLD = 0.6;
+  const MIN_PREFIX_MATCH_LENGTH = 4;
 
   const DONE_STATUSES = {
     1: ['added', 'already-in-target'],
@@ -84,25 +84,17 @@ function gmPlaceSearch() {
       .trim();
   }
 
-  // 1 = same name; containment (a branch suffix like "Blue Bottle Coffee -
-  // Hayes Valley") also scores 1; otherwise token Dice overlap.
-  function nameSimilarity(a, b) {
-    const na = normalizeName(a);
-    const nb = normalizeName(b);
-    if (!na || !nb) return 0;
-    if (na === nb) return 1;
-    const shorter = na.length <= nb.length ? na : nb;
-    const longer = shorter === na ? nb : na;
-    if (shorter.length >= 4 && (' ' + longer + ' ').includes(' ' + shorter + ' ')) return 1;
-    const ta = new Set(na.split(' '));
-    const tb = new Set(nb.split(' '));
-    let shared = 0;
-    for (const t of ta) if (tb.has(t)) shared++;
-    return (2 * shared) / (ta.size + tb.size);
-  }
-
+  // Same normalized name, or one is the other plus trailing whole words (a
+  // branch suffix like "Blue Bottle Coffee - Hayes Valley"). Partial overlap
+  // ("Joe's Pizza" vs "Joe's Coffee") is a different place and never matches.
   function namesMatch(expected, actual) {
-    return nameSimilarity(expected, actual) >= NAME_MATCH_THRESHOLD;
+    const ne = normalizeName(expected);
+    const na = normalizeName(actual);
+    if (!ne || !na) return false;
+    if (ne === na) return true;
+    const shorter = ne.length <= na.length ? ne : na;
+    const longer = shorter === ne ? na : ne;
+    return shorter.length >= MIN_PREFIX_MATCH_LENGTH && longer.startsWith(shorter + ' ');
   }
 
   function placeKey(item) {
@@ -114,21 +106,26 @@ function gmPlaceSearch() {
   }
 
   // Accepts data/plan.json rows (or bare { name, target } objects) and keeps
-  // only places with a target list, deduplicated by name + target.
+  // only places with a target list. A name search can't tell two places with
+  // the same name apart (the plan has no address or place ID), so every name
+  // that appears more than once is left out of the queue for manual handling.
   function buildQueue(planRows) {
     if (!Array.isArray(planRows)) throw new Error('expected an array of plan rows');
-    const seen = new Set();
-    const queue = [];
+    const items = [];
+    const counts = new Map();
     for (const row of planRows) {
       if (!row || typeof row.name !== 'string' || !row.name.trim()) continue;
       if (typeof row.target !== 'string' || !row.target.trim()) continue;
       const item = { name: row.name.trim(), target: row.target.trim() };
-      const key = placeKey(item);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      queue.push(item);
+      const norm = normalizeName(item.name);
+      counts.set(norm, (counts.get(norm) || 0) + 1);
+      items.push(item);
     }
-    return queue;
+    const isAmbiguous = item => counts.get(normalizeName(item.name)) > 1;
+    return {
+      queue: items.filter(item => !isAmbiguous(item)),
+      ambiguous: items.filter(isAmbiguous),
+    };
   }
 
   function emptyState() {
@@ -373,10 +370,14 @@ function gmPlaceSearch() {
   }
 
   function load(planRows) {
-    const queue = buildQueue(planRows);
+    const { queue, ambiguous } = buildQueue(planRows);
     const state = { ...loadState(), queue, running: false, current: null };
     saveState(state);
     console.log(`gmps: queued ${queue.length} place(s); earlier results kept, so finished places are skipped.`);
+    if (ambiguous.length) {
+      console.log(`gmps: left out ${ambiguous.length} place(s) whose name appears more than once - move these by hand:`);
+      console.table(ambiguous);
+    }
     return queue.length;
   }
 
@@ -421,7 +422,6 @@ function gmPlaceSearch() {
   return {
     // pure, exported for tests
     normalizeName,
-    nameSimilarity,
     namesMatch,
     placeKey,
     searchUrl,

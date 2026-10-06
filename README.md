@@ -119,7 +119,9 @@ wrong, a place ends up in both lists, never in neither.
    userscript so it resumes by itself.
 4. Each place is checked before anything is clicked: the page title has to
    match the queued name, and the place has to still be in `Starred places`.
-   Anything that doesn't match is skipped and logged. `gmps.status()` shows
+   Anything that doesn't match is skipped and logged. A name search can't
+   tell two places with the same name apart, so `gmps.load()` leaves out any
+   name that appears more than once and lists those for you to move by hand. `gmps.status()` shows
    progress and skips; `gmps.stop()` halts.
 5. When phase 1 reports complete, check the target lists, then run
    `gmps.start(2)` and resume the same way after each load.
