@@ -62,8 +62,11 @@ of its browser path in `place-search-script.page.test.js`) and `npm run check`
   `categorize.js`'s) to `data/starred-places.json` and writes the expected
   target list for every place to `data/plan.json` (gitignored). Pure
   derivation, never hand-edited — re-run any time `data/starred-places.json`
-  or `move-script.js`'s category constants change. This is the offline
-  preview of what a live `processStarred()` run would move where.
+ or `move-script.js`'s category constants change. This is the offline
+ preview of what a live `processStarred()` run would move where. Its parsing
+ and routing are exported and pinned by `scripts/plan.test.js` (synthetic rows
+ only), including a check that its regex parse of `move-script.js` matches the
+ arrays' evaluated values.
 - `data/starred-places.json` — gitignored. Real scraped personal data (home/work
   addresses, medical providers, kids' school, etc.). Never commit it, never print
   its full contents into anything that gets committed or shared.
