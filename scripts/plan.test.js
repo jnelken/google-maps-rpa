@@ -117,9 +117,13 @@ test('parseTypeArray throws when the constant is missing', () => {
 test('loadBuckets parses every move-script.js bucket non-empty, matching its runtime values', async () => {
   const buckets = loadBuckets(MOVE_SRC);
   const read = await evaluatedMoveScriptConsts();
-  assert.deepEqual(buckets.map(([label]) => label), BUCKET_CONSTS.map(([label]) => label));
   for (const [i, [label, types]] of buckets.entries()) {
     assert.ok(types.length > 0, `${label} is empty`);
     assert.deepEqual(types, read(BUCKET_CONSTS[i][1]), `${label} parsed differently than it evaluates`);
   }
+});
+
+test('loadBuckets matches move-script.js BUCKETS labels and order', async () => {
+  const read = await evaluatedMoveScriptConsts();
+  assert.deepEqual(loadBuckets(MOVE_SRC), read('BUCKETS'));
 });
