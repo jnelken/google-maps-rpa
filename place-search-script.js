@@ -51,29 +51,19 @@
 // itself has only been statically reviewed and unit-tested (pure logic, see
 // place-search-script.test.js) - it has not been run end-to-end live yet.
 
-function gmPlaceSearch() {
-  const STATE_KEY = '__gmps';
-  const SRC_KEY = '__gmpsSrc';
-  const OWNER_KEY = '__gmpsOwner';
-  const SOURCE_LIST_LABEL = 'Starred places';
+// The script is split into three factories. Every resume rebuilds them from
+// the source saved under SRC_KEY (see the bottom of this file), so each one
+// must be a self-contained top-level function declaration - no other
+// top-level bindings are visible after a reload.
+
+// Pure logic, no DOM or storage access (unit-tested).
+function gmpsLogic() {
   const MAX_TRIES = 3;
-  // Navigating away sooner than this after a toggle cancels the save in
-  // flight (confirmed live: an add that reported success didn't persist).
-  const POST_TOGGLE_WAIT_MS = 5500;
-  const POST_SKIP_WAIT_MS = 500;
-  const PAGE_READY_TIMEOUT_MS = 20000;
-  const MENU_TIMEOUT_MS = 8000;
-  // A pending navigation older than this means the page we're on isn't the
-  // one we navigated to (user wandered off, tab was restored later). Generous
-  // because a human may take a while to paste the resume one-liner.
-  const STALE_NAV_MS = 15 * 60 * 1000;
   const DONE_STATUSES = {
     1: ['added', 'already-in-target'],
     2: ['removed', 'already-removed'],
   };
   const RETRYABLE_STATUSES = ['load-timeout', 'menu-timeout', 'target-not-confirmed'];
-
-  // ---- Pure logic (unit-tested) ----
 
   function normalizeName(name) {
     return String(name || '')
@@ -213,34 +203,29 @@ function gmPlaceSearch() {
     return counts;
   }
 
-  // ---- Browser side ----
+  return {
+    DONE_STATUSES,
+    normalizeName,
+    namesMatch,
+    placeKey,
+    searchUrl,
+    buildQueue,
+    emptyState,
+    phaseResult,
+    isStillCurrent,
+    nextItem,
+    recordResult,
+    clearSkipped,
+    decidePhase1,
+    decidePhase2,
+    summarize,
+  };
+}
 
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(STATE_KEY);
-      return raw ? { ...emptyState(), ...JSON.parse(raw) } : emptyState();
-    } catch (err) {
-      console.log('gmps: could not read saved state, starting empty', err);
-      return emptyState();
-    }
-  }
-
-  function saveState(state) {
-    localStorage.setItem(STATE_KEY, JSON.stringify(state));
-  }
-
-  // localStorage is shared by every google.com tab, but sessionStorage is
-  // per tab and survives this tab's own navigations - so a token kept there
-  // stops other open Maps tabs (and their userscript copies) from acting.
-  function tabOwner() {
-    return sessionStorage.getItem(OWNER_KEY);
-  }
-
-  function claimTab() {
-    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    sessionStorage.setItem(OWNER_KEY, token);
-    return token;
-  }
+// Reading and toggling the current place page's Save menu.
+function gmpsPage() {
+  const SOURCE_LIST_LABEL = 'Starred places';
+  const MENU_TIMEOUT_MS = 8000;
 
   function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -313,6 +298,57 @@ function gmPlaceSearch() {
     window.__gmpsToggled = true;
     clickTarget.click();
     return true;
+  }
+
+  return { SOURCE_LIST_LABEL, delay, waitFor, readH1, openSaveMenu, readMenu, toggleOnce };
+}
+
+// Run state, page-to-page flow and the gmps.* console commands.
+function gmPlaceSearch() {
+  const STATE_KEY = '__gmps';
+  const SRC_KEY = '__gmpsSrc';
+  const OWNER_KEY = '__gmpsOwner';
+  // Navigating away sooner than this after a toggle cancels the save in
+  // flight (confirmed live: an add that reported success didn't persist).
+  const POST_TOGGLE_WAIT_MS = 5500;
+  const POST_SKIP_WAIT_MS = 500;
+  const PAGE_READY_TIMEOUT_MS = 20000;
+  // A pending navigation older than this means the page we're on isn't the
+  // one we navigated to (user wandered off, tab was restored later). Generous
+  // because a human may take a while to paste the resume one-liner.
+  const STALE_NAV_MS = 15 * 60 * 1000;
+
+  const {
+    DONE_STATUSES, normalizeName, namesMatch, placeKey, searchUrl, buildQueue, emptyState, phaseResult,
+    isStillCurrent, nextItem, recordResult, clearSkipped, decidePhase1, decidePhase2, summarize,
+  } = gmpsLogic();
+  const { SOURCE_LIST_LABEL, delay, waitFor, readH1, openSaveMenu, readMenu, toggleOnce } = gmpsPage();
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STATE_KEY);
+      return raw ? { ...emptyState(), ...JSON.parse(raw) } : emptyState();
+    } catch (err) {
+      console.log('gmps: could not read saved state, starting empty', err);
+      return emptyState();
+    }
+  }
+
+  function saveState(state) {
+    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  }
+
+  // localStorage is shared by every google.com tab, but sessionStorage is
+  // per tab and survives this tab's own navigations - so a token kept there
+  // stops other open Maps tabs (and their userscript copies) from acting.
+  function tabOwner() {
+    return sessionStorage.getItem(OWNER_KEY);
+  }
+
+  function claimTab() {
+    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    sessionStorage.setItem(OWNER_KEY, token);
+    return token;
   }
 
   function goTo(state, item) {
@@ -474,6 +510,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = gmPlaceSearch();
 } else {
   window.gmps = gmPlaceSearch();
-  localStorage.setItem(window.gmps.SRC_KEY, '(' + gmPlaceSearch.toString() + ')');
+  const factories = [gmpsLogic, gmpsPage, gmPlaceSearch].map(fn => fn.toString()).join('\n');
+  localStorage.setItem(window.gmps.SRC_KEY, `(function () {\n${factories}\nreturn gmPlaceSearch;\n})()`);
   window.gmps.resume();
 }

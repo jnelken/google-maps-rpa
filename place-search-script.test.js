@@ -10,6 +10,14 @@ const menu = (overrides = {}) => ({
   ...overrides,
 });
 
+test('exports the pure helpers, the console commands and SRC_KEY', () => {
+  assert.deepEqual(Object.keys(gmps).sort(), [
+    'SRC_KEY', 'buildQueue', 'clearSkipped', 'decidePhase1', 'decidePhase2', 'emptyState',
+    'isStillCurrent', 'load', 'namesMatch', 'nextItem', 'normalizeName', 'placeKey',
+    'recordResult', 'reset', 'resume', 'retry', 'searchUrl', 'start', 'status', 'stop', 'summarize',
+  ]);
+});
+
 test('normalizeName strips accents, punctuation and case', () => {
   assert.equal(gmps.normalizeName('Café de Flore!'), 'cafe de flore');
   assert.equal(gmps.normalizeName('Ben & Jerry’s'), 'ben and jerry s');
