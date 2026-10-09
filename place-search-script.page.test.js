@@ -25,6 +25,7 @@ function createBrowser({ h1 = 'Test Cafe', lists, onSaveClick = () => {}, localS
   const sessionStorage = createStorage();
   const clicks = [];
   const navigations = [];
+  const logs = [];
   let currentLists = lists;
   let menuOpen = false;
 
@@ -54,7 +55,7 @@ function createBrowser({ h1 = 'Test Cafe', lists, onSaveClick = () => {}, localS
     page = {
       localStorage,
       sessionStorage,
-      console: { log() {}, table() {} },
+      console: { log: (...args) => logs.push(args.join(' ')), table() {} },
       setTimeout: (fn, ms) => setTimeout(fn, Math.min(ms, 2)),
       document,
       location: { assign: url => navigations.push(url) },
@@ -68,6 +69,7 @@ function createBrowser({ h1 = 'Test Cafe', lists, onSaveClick = () => {}, localS
     store,
     clicks,
     navigations,
+    logs,
     setLists: next => { currentLists = next; },
     pasteScript() {
       load();
@@ -167,4 +169,87 @@ test('gmps.stop() while a page is loading prevents the toggle and stays stopped'
   const state = browser.state();
   assert.equal(state.running, false);
   assert.equal(state.results[KEY], undefined);
+});
+
+const COMMANDS = ['load', 'start', 'stop', 'resume', 'retry', 'status', 'reset'];
+
+test('the saved source rebuilds the full command set in a bare page', () => {
+  const browser = createBrowser({ lists: [] });
+  browser.pasteScript();
+  const bare = { localStorage: createStorage(), sessionStorage: createStorage(), console };
+  bare.window = bare;
+  vm.createContext(bare);
+  const gmps = vm.runInContext(`(${browser.store.__gmpsSrc})()`, bare);
+  for (const name of COMMANDS) assert.equal(typeof gmps[name], 'function', name);
+  assert.equal(gmps.SRC_KEY, '__gmpsSrc');
+  assert.equal(gmps.searchUrl('A B'), 'https://www.google.com/maps/search/A%20B');
+});
+
+test('re-running the pasted file (the userscript path) resumes an owned run', async () => {
+  const browser = createBrowser({ lists: [['Starred places', true], ['Coffee Shops', false]] });
+  browser.pasteScript().load([{ name: 'Test Cafe', target: 'Coffee Shops' }]);
+  browser.gmps.start(1);
+  await settle();
+
+  browser.pasteScript();
+  await settle();
+  assert.deepEqual(browser.clicks, ['add:Coffee Shops']);
+  assert.equal(browser.state().results[KEY].p1.status, 'added');
+});
+
+test('phase 1 records a place already in its target without toggling', async () => {
+  const browser = createBrowser({ lists: [['Starred places', true], ['Coffee Shops', true]] });
+  browser.pasteScript().load([{ name: 'Test Cafe', target: 'Coffee Shops' }]);
+  browser.gmps.start(1);
+  await settle();
+  await browser.reloadAndResume();
+  assert.deepEqual(browser.clicks, []);
+  assert.equal(browser.state().results[KEY].p1.status, 'already-in-target');
+});
+
+test('a stale navigation is recorded as a load-timeout and navigated again', async () => {
+  const browser = createBrowser({ lists: [['Starred places', true], ['Coffee Shops', false]] });
+  browser.pasteScript().load([{ name: 'Test Cafe', target: 'Coffee Shops' }]);
+  browser.gmps.start(1);
+  await settle();
+  const state = browser.state();
+  state.current.at = Date.now() - 16 * 60 * 1000;
+  browser.store.__gmps = JSON.stringify(state);
+
+  await browser.reloadAndResume();
+  assert.deepEqual(browser.clicks, []);
+  const { status, tries } = browser.state().results[KEY].p1;
+  assert.deepEqual({ status, tries }, { status: 'load-timeout', tries: 1 });
+  assert.equal(browser.navigations.length, 2);
+  assert.equal(browser.state().running, true);
+});
+
+test('start with an empty queue does nothing', async () => {
+  const browser = createBrowser({ lists: [] });
+  browser.pasteScript().start(1);
+  await settle();
+  assert.deepEqual(browser.navigations, []);
+  assert.equal(browser.store.__gmps, undefined);
+  assert.ok(browser.logs.some(line => line.includes('queue is empty')));
+  assert.throws(() => browser.gmps.start(3));
+});
+
+test('status, retry and reset act on the saved state', async () => {
+  const browser = createBrowser({ h1: 'Some Other Cafe', lists: [['Starred places', true], ['Coffee Shops', false]] });
+  browser.pasteScript().load([{ name: 'Test Cafe', target: 'Coffee Shops' }]);
+  browser.gmps.start(1);
+  await settle();
+  await browser.reloadAndResume();
+  assert.equal(browser.state().results[KEY].p1.status, 'name-mismatch');
+
+  browser.logs.length = 0;
+  browser.gmps.status();
+  assert.deepEqual(browser.logs, ['gmps: phase 1, stopped, 1 queued']);
+
+  browser.gmps.retry();
+  assert.equal(browser.state().results[KEY].p1, undefined);
+  assert.equal(browser.state().queue.length, 1);
+
+  browser.gmps.reset();
+  assert.equal(browser.store.__gmps, undefined);
 });
