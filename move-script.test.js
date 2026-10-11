@@ -3,6 +3,12 @@
 // objects answering exactly the selectors the script uses. Timers are
 // shortened and Date.now() advances 1s per call, so bounded waits time out
 // fast.
+//
+// The fake models the page move-script.js assumes, not live Maps: clicking
+// the [aria-checked] row toggles it, and document.body.click() closes a Save
+// menu that can be reopened on the same load. CLAUDE.md records that live
+// Maps (2026-08) does neither. These tests pin the script's current
+// behavior; they are not evidence that it works live.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
