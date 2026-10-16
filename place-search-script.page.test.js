@@ -254,7 +254,6 @@ test('status, retry and reset act on the saved state', async () => {
   assert.equal(browser.store.__gmps, undefined);
 });
 
-// Characterization for loadState / tab ownership before extracting gmpsStore().
 test('missing persisted state loads as empty defaults', () => {
   const browser = createBrowser({ lists: [] });
   browser.pasteScript();
