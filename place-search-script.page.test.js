@@ -253,3 +253,62 @@ test('status, retry and reset act on the saved state', async () => {
   browser.gmps.reset();
   assert.equal(browser.store.__gmps, undefined);
 });
+
+test('missing persisted state loads as empty defaults', () => {
+  const browser = createBrowser({ lists: [] });
+  browser.pasteScript();
+  assert.equal(browser.store.__gmps, undefined);
+  browser.logs.length = 0;
+  browser.gmps.status();
+  assert.deepEqual(browser.logs, ['gmps: phase 1, stopped, 0 queued']);
+  assert.equal(browser.store.__gmps, undefined);
+});
+
+test('malformed persisted state starts empty and logs', () => {
+  const browser = createBrowser({ lists: [] });
+  browser.store.__gmps = '{not-json';
+  browser.pasteScript();
+  browser.logs.length = 0;
+  browser.gmps.status();
+  assert.ok(browser.logs.some(line => line.startsWith('gmps: could not read saved state, starting empty')));
+  assert.deepEqual(browser.logs.filter(line => line.startsWith('gmps: phase')), ['gmps: phase 1, stopped, 0 queued']);
+});
+
+test('partial persisted state fills missing fields from emptyState', () => {
+  const browser = createBrowser({ lists: [] });
+  browser.store.__gmps = JSON.stringify({
+    queue: [{ name: 'Test Cafe', target: 'Coffee Shops' }],
+    results: { [KEY]: { p1: { status: 'added', tries: 1, at: 1 } } },
+  });
+  browser.pasteScript();
+  browser.logs.length = 0;
+  browser.gmps.status();
+  assert.deepEqual(browser.logs, ['gmps: phase 1, stopped, 1 queued']);
+
+  // stop() re-persists through loadState, so missing fields are filled in.
+  browser.gmps.stop();
+  const state = browser.state();
+  assert.deepEqual(state.queue, [{ name: 'Test Cafe', target: 'Coffee Shops' }]);
+  assert.equal(state.results[KEY].p1.status, 'added');
+  assert.equal(state.phase, 1);
+  assert.equal(state.running, false);
+  assert.equal(state.current, null);
+  assert.equal(state.owner, null);
+});
+
+test('resume does nothing when persisted owner does not match this tab', async () => {
+  const browser = createBrowser({ lists: [['Starred places', true], ['Coffee Shops', false]] });
+  browser.pasteScript().load([{ name: 'Test Cafe', target: 'Coffee Shops' }]);
+  browser.gmps.start(1);
+  await settle();
+  const state = browser.state();
+  assert.ok(state.owner);
+  state.owner = 'someone-else';
+  browser.store.__gmps = JSON.stringify(state);
+
+  await browser.reloadAndResume();
+  assert.deepEqual(browser.clicks, []);
+  assert.equal(browser.navigations.length, 1);
+  assert.equal(browser.state().results[KEY], undefined);
+  assert.equal(browser.state().running, true);
+});
