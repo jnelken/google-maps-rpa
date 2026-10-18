@@ -473,8 +473,6 @@ function moveFlows({ timing, listRows, dialog }) {
     if (stillPending.length > 0) {
       console.log(`${stillPending.length} added item(s) not found in the currently-rendered list. Scroll down to load more, then run sweepRemoveFromStarred() again.`);
       console.table(stillPending);
-    } else {
-      console.log(`All added items have been removed from ${SOURCE_LIST_LABEL}.`);
     }
   }
 
