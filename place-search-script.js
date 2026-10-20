@@ -51,7 +51,7 @@
 // itself has only been statically reviewed and unit-tested (pure logic, see
 // place-search-script.test.js) - it has not been run end-to-end live yet.
 
-// The script is split into four factories. Every resume rebuilds them from
+// The script is split into five factories. Every resume rebuilds them from
 // the source saved under SRC_KEY (see the bottom of this file), so each one
 // must be a self-contained top-level function declaration - no other
 // top-level bindings are visible after a reload.
@@ -339,9 +339,11 @@ function gmpsStore() {
   return { STATE_KEY, OWNER_KEY, loadState, saveState, tabOwner, claimTab };
 }
 
-// Page-to-page flow and the gmps.* console commands.
-function gmPlaceSearch() {
-  const SRC_KEY = '__gmpsSrc';
+// Walking the queue from page load to page load. Holds no state of its own:
+// every step re-reads the persisted state through gmpsStore(), and the
+// one-toggle and one-resume guards live on `window`, so the copy
+// gmPlaceSearch() builds and any other copy see the same run.
+function gmpsFlow() {
   // Navigating away sooner than this after a toggle cancels the save in
   // flight (confirmed live: an add that reported success didn't persist).
   const POST_TOGGLE_WAIT_MS = 5500;
@@ -353,11 +355,11 @@ function gmPlaceSearch() {
   const STALE_NAV_MS = 15 * 60 * 1000;
 
   const {
-    DONE_STATUSES, normalizeName, namesMatch, placeKey, searchUrl, buildQueue, emptyState, phaseResult,
-    isStillCurrent, nextItem, recordResult, clearSkipped, decidePhase1, decidePhase2, summarize,
+    namesMatch, placeKey, searchUrl, isStillCurrent, nextItem, recordResult,
+    decidePhase1, decidePhase2, summarize,
   } = gmpsLogic();
   const { SOURCE_LIST_LABEL, delay, waitFor, readH1, openSaveMenu, readMenu, toggleOnce } = gmpsPage();
-  const { STATE_KEY, loadState, saveState, tabOwner, claimTab } = gmpsStore();
+  const { loadState, saveState, tabOwner } = gmpsStore();
 
   function goTo(state, item) {
     const next = { ...state, current: { key: placeKey(item), phase: state.phase, at: Date.now() } };
@@ -436,6 +438,20 @@ function gmPlaceSearch() {
       window.__gmpsActive = false;
     }
   }
+
+  return { resume };
+}
+
+// The gmps.* console commands, and the saved source every resume rebuilds.
+function gmPlaceSearch() {
+  const SRC_KEY = '__gmpsSrc';
+
+  const {
+    DONE_STATUSES, normalizeName, namesMatch, placeKey, searchUrl, buildQueue, emptyState, phaseResult,
+    isStillCurrent, nextItem, recordResult, clearSkipped, decidePhase1, decidePhase2, summarize,
+  } = gmpsLogic();
+  const { STATE_KEY, loadState, saveState, claimTab } = gmpsStore();
+  const { resume } = gmpsFlow();
 
   function load(planRows) {
     const { queue, ambiguous } = buildQueue(planRows);
@@ -518,7 +534,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = gmPlaceSearch();
 } else {
   window.gmps = gmPlaceSearch();
-  const factories = [gmpsLogic, gmpsPage, gmpsStore, gmPlaceSearch].map(fn => fn.toString()).join('\n');
+  const factories = [gmpsLogic, gmpsPage, gmpsStore, gmpsFlow, gmPlaceSearch].map(fn => fn.toString()).join('\n');
   localStorage.setItem(window.gmps.SRC_KEY, `(function () {\n${factories}\nreturn gmPlaceSearch;\n})()`);
   window.gmps.resume();
 }
