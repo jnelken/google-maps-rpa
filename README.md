@@ -32,9 +32,10 @@ places` until you explicitly run phase 2, so it's safe to stop after phase 1
 and review before committing to the removals.
 
 `move-script.js` routes each currently-rendered Starred place into one of
-the following lists, based on its category (matching the taxonomy in
-`scripts/categorize.js` — `RESTAURANT_TYPES`, `CAFE_TYPES`,
-`NIGHTLIFE_TYPES`, etc.):
+the following lists, based on its own category taxonomy
+(`RESTAURANT_TYPES`, `CAFE_TYPES`, `NIGHTLIFE_TYPES`, etc. — the single
+source of truth; `scripts/plan.js` reads those same arrays for the offline
+preview):
 
 - `Restaurants` (restaurant/cuisine categories)
 - `Coffee Shops` (cafes, coffee shops, juice bars, health food)

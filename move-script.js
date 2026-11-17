@@ -4,12 +4,11 @@
 // places to the target list for its category (Restaurants, Coffee Shops,
 // Nightlife, Forest, Visited, Outdoors, Health, Kids, Beauty, Shopping,
 // Errands, Fitness, Going Out, Ashrams, Desks), or ARCHIVE_LIST_LABEL
-// (permanently closed). Category -> list mapping mirrors
-// scripts/categorize.js's taxonomy (RESTAURANT_TYPES, CAFE_TYPES, etc.),
-// derived from real category strings in data/starred-places.json - kept in
-// sync manually. Does NOT touch SOURCE_LIST_LABEL membership. Anything
-// matching no category (categorize.js's "Skipped"/"FlagForDeletion") is left
-// alone and logged to `skipped` - that's expected, not a bug.
+// (permanently closed). Category -> list mapping is owned here
+// (RESTAURANT_TYPES, CAFE_TYPES, etc.), derived from real category strings in
+// data/starred-places.json. Does NOT touch SOURCE_LIST_LABEL membership.
+// Anything matching no category is left alone and logged to `skipped` -
+// that's expected, not a bug.
 //
 // Phase 2 - sweepRemoveFromStarred(): run this separately once you're happy
 // with what phase 1 added. It removes every place phase 1 successfully
@@ -60,17 +59,15 @@ const GOING_OUT_LIST_LABEL = 'Going Out';
 const ASHRAMS_LIST_LABEL = 'Ashrams';
 const DESKS_LIST_LABEL = 'Desks';
 
-// Derived verbatim from scripts/categorize.js's category taxonomy, which was
-// itself derived from real category strings in data/starred-places.json -
-// kept in sync manually.
+// Category taxonomy for Jake's starred places — single source of truth.
+// Derived from real category strings in data/starred-places.json.
 const RESTAURANT_TYPES = [
   'restaurant', 'italian', 'mexican', 'chicken', 'american', 'new american',
   'japanese', 'british', 'mediterranean', 'sri lankan', 'bistro', 'diner',
   'grill',
 ];
 
-// Full CAFE_TYPES bucket from categorize.js, including 'juice' and 'health
-// food' - that's Jake's own grouping, used verbatim.
+// Includes 'juice' and 'health food' — Jake's own grouping.
 const CAFE_TYPES = ['cafe', 'coffee shop', 'juice', 'health food'];
 
 const NIGHTLIFE_TYPES = ['bar', 'pub', 'cocktail bar', 'beer hall', 'night club'];

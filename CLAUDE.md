@@ -50,24 +50,16 @@ two phases against a fake list page in `move-script.test.js`) and `npm run check
 - `diagnose-click.js` — a read-only diagnostic used once to figure out why
   `row.click()` wasn't opening place detail panels (see gotchas below). Kept around
   as a debugging aid, not part of the normal workflow.
-- `scripts/categorize.js` — offline Node tool (`node scripts/categorize.js`), no
-  browser involved. Reads `data/starred-places.json` (gitignored — personal data)
-  and buckets places into named categories by matching the last `·`-separated
-  segment of their raw category string against curated arrays
-  (`RESTAURANT_TYPES`, `CAFE_TYPES`, `HEALTH_TYPES`, etc.). This is the source of
-  truth for "what real category strings exist in Jake's data and which bucket they
-  belong to" — `move-script.js`'s category constants should be derived from here,
-  not guessed or copied from generic Google Maps category lists.
 - `scripts/plan.js` — offline Node tool (`node scripts/plan.js`), no browser
-  involved. Applies `move-script.js`'s exact category constants (not
-  `categorize.js`'s) to `data/starred-places.json` and writes the expected
+  involved. Applies `move-script.js`'s exact category constants (the only
+  taxonomy source) to `data/starred-places.json` and writes the expected
   target list for every place to `data/plan.json` (gitignored). Pure
   derivation, never hand-edited — re-run any time `data/starred-places.json`
- or `move-script.js`'s category constants change. This is the offline
- preview of what a live `processStarred()` run would move where. Its parsing
- and routing are exported and pinned by `scripts/plan.test.js` (synthetic rows
- only), including a check that its regex parse of `move-script.js` matches the
- arrays' evaluated values.
+  or `move-script.js`'s category constants change. This is the offline
+  preview of what a live `processStarred()` run would move where. Its parsing
+  and routing are exported and pinned by `scripts/plan.test.js` (synthetic rows
+  only), including a check that its regex parse of `move-script.js` matches the
+  arrays' evaluated values.
 - `data/starred-places.json` — gitignored. Real scraped personal data (home/work
   addresses, medical providers, kids' school, etc.). Never commit it, never print
   its full contents into anything that gets committed or shared.
